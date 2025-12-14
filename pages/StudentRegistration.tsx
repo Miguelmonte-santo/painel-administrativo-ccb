@@ -41,34 +41,84 @@ const StudentRegistration: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Verificar se o email existe na lista de alunos aprovados (allowlist)
-      const { data: student, error: selectError } = await supabase
+      // 1. Buscar os dados completos que a secretaria aprovou na tabela 'alunos'
+      const { data: studentData, error: selectError } = await supabase
         .from('alunos')
-        .select('id')
+        .select('*') // Pega tudo: RA, CPF, Nome, Foto, ID da Inscrição...
         .eq('email', email)
         .single();
         
-      if (selectError || !student) {
+      if (selectError || !studentData) {
         setError('Matrícula não encontrada. Verifique se o email está correto ou contate a administração.');
         setLoading(false);
         return;
       }
       
-      // 2. Se o email for válido, criar o usuário no Supabase Auth
+      // 2. Buscar dados adicionais de endereço na tabela original de 'inscricoes' se necessário
+      // (Opcional: se você quiser preencher o endereço no perfil também)
+      const { data: inscricaoData } = await supabase
+        .from('inscricoes')
+        .select('telefone, data_nascimento, rg, cep, rua, numero, complemento, bairro, municipio, uf')
+        .eq('id', studentData.inscricao_origem_id)
+        .single();
+
+      // 3. Criar o usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
+        options: {
+          // Salva metadados úteis no token do usuário
+          data: {
+            full_name: studentData.nome,
+            ra: studentData.ra
+          }
+        }
       });
 
-      if (authError) {
-        throw authError;
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // 4. A MÁGICA: Copiar os dados da tabela 'alunos'/'inscricoes' para a tabela 'profiles'
+        // Agora que o usuário existe, atualizamos o perfil dele com os dados aprovados.
+        
+        // Separa Nome e Sobrenome (já que no 'alunos' está junto)
+        const nomeCompleto = studentData.nome.split(' ');
+        const primeiroNome = nomeCompleto[0];
+        const restanteSobrenome = nomeCompleto.slice(1).join(' ');
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            nome: primeiroNome,
+            sobrenome: restanteSobrenome,
+            ra: studentData.ra,
+            cpf: studentData.cpf,
+            avatar_url: studentData.foto_rosto_url, // A foto da biometria vai para o avatar inicial
+            // Dados vindos da inscrição original (se encontrados)
+            telefone: inscricaoData?.telefone,
+            data_nascimento: inscricaoData?.data_nascimento,
+            rg: inscricaoData?.rg,
+            cep: inscricaoData?.cep,
+            rua: inscricaoData?.rua,
+            numero: inscricaoData?.numero,
+            complemento: inscricaoData?.complemento,
+            bairro: inscricaoData?.bairro,
+            municipio: inscricaoData?.municipio,
+            uf: inscricaoData?.uf
+          })
+          .eq('id', authData.user.id); // Usa o ID do usuário recém criado
+
+        if (profileError) {
+          console.error('Erro ao atualizar perfil:', profileError);
+          // Não paramos o fluxo aqui, pois o login foi criado, mas logamos o erro
+        }
       }
 
-      setSuccessMessage('Cadastro realizado com sucesso! Verifique sua caixa de entrada para confirmar seu email.');
+      setSuccessMessage('Cadastro realizado com sucesso! Agora você pode acessar o Portal do Aluno.');
 
     } catch (err: any) {
       if (err.message.includes('User already registered')) {
-         setError('Este email já foi cadastrado. Tente fazer login ou redefinir sua senha.');
+         setError('Este email já foi cadastrado. Tente fazer login no portal.');
       } else {
          setError(`Ocorreu um erro: ${err.message}`);
       }
@@ -82,7 +132,7 @@ const StudentRegistration: React.FC = () => {
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md dark:bg-dark-800">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cadastro de Aluno</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Crie sua senha de acesso à plataforma</p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Defina sua senha para acessar o portal</p>
         </div>
 
         {!successMessage ? (
@@ -156,10 +206,16 @@ const StudentRegistration: React.FC = () => {
             </form>
         ) : (
             <div className="text-center py-4">
-                 <div className="flex items-center justify-center text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-4 rounded-md">
+                 <div className="flex items-center justify-center text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-4 rounded-md mb-4">
                     <CheckCircle className="w-6 h-6 mr-3 flex-shrink-0" />
                     <p className="text-sm font-medium">{successMessage}</p>
                 </div>
+                <a 
+                  href="https://seu-portal-do-aluno.vercel.app" 
+                  className="text-primary-600 hover:text-primary-500 font-medium underline"
+                >
+                  Ir para o Login do Portal
+                </a>
             </div>
         )}
       </div>
