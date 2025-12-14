@@ -2,26 +2,37 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import Modal from '../components/ui/Modal';
 import { Pencil, Trash2, Search } from 'lucide-react';
-import type { Aluno } from '../types';
+
+interface Student {
+  id: string;
+  nome: string;
+  email: string;
+  ra: string;
+  cpf: string;
+  turma: string;
+  ativo: boolean;
+  created_at: string;
+}
 
 const Students: React.FC = () => {
-  const [students, setStudents] = useState<Aluno[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Estados para Edição
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Aluno | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Buscar alunos
+  // 1. Buscar apenas alunos ATIVOS
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('alunos')
         .select('*')
+        .eq('ativo', true) // <--- CORREÇÃO: Filtra só os ativos
         .order('nome', { ascending: true });
 
       if (error) throw error;
@@ -37,32 +48,32 @@ const Students: React.FC = () => {
     fetchStudents();
   }, [fetchStudents]);
 
-  // Função de Excluir
+  // 2. Função de Desativar (Soft Delete)
   const handleDelete = async (id: string, nome: string) => {
-    const confirmDelete = window.confirm(`Tem certeza que deseja excluir o aluno ${nome}? Esta ação não pode ser desfeita.`);
+    const confirmDelete = window.confirm(`Tem certeza que deseja desativar o aluno ${nome}? Ele perderá o acesso à plataforma.`);
     
     if (confirmDelete) {
       try {
-        // Deleta da tabela 'alunos'
+        // CORREÇÃO: Usa UPDATE em vez de DELETE
         const { error } = await supabase
           .from('alunos')
-          .delete()
+          .update({ ativo: false }) 
           .eq('id', id);
 
         if (error) throw error;
 
-        // Atualiza a lista local removendo o aluno
+        // Atualiza a lista visualmente
         setStudents(prev => prev.filter(student => student.id !== id));
-        alert('Aluno excluído com sucesso!');
+        alert('Aluno desativado com sucesso!');
         
       } catch (err: any) {
-        alert('Erro ao excluir: ' + err.message);
+        alert('Erro ao desativar: ' + err.message);
       }
     }
   };
 
-  // Funções de Edição
-  const handleEditClick = (student: Aluno) => {
+  // Funções de Edição (Mantidas iguais)
+  const handleEditClick = (student: Student) => {
     setEditingStudent(student);
     setIsEditModalOpen(true);
   };
@@ -88,7 +99,7 @@ const Students: React.FC = () => {
 
       alert('Dados atualizados com sucesso!');
       setIsEditModalOpen(false);
-      fetchStudents(); // Recarrega a lista
+      fetchStudents(); 
 
     } catch (err: any) {
       alert('Erro ao atualizar: ' + err.message);
@@ -97,7 +108,6 @@ const Students: React.FC = () => {
     }
   };
 
-  // Filtro de busca
   const filteredStudents = students.filter(student =>
     student.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.ra.includes(searchTerm) ||
@@ -109,7 +119,6 @@ const Students: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Alunos Matriculados</h2>
         
-        {/* Barra de Busca */}
         <div className="relative w-full sm:w-64">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search size={18} className="text-gray-400" />
@@ -141,7 +150,7 @@ const Students: React.FC = () => {
             {loading ? (
               <tr><td colSpan={5} className="text-center py-4 text-gray-500">Carregando...</td></tr>
             ) : filteredStudents.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-4 text-gray-500">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={5} className="text-center py-4 text-gray-500">Nenhum aluno ativo encontrado.</td></tr>
             ) : (
               filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors">
@@ -164,7 +173,7 @@ const Students: React.FC = () => {
                     <button 
                       onClick={() => handleDelete(student.id, student.nome)}
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
-                      title="Excluir"
+                      title="Desativar"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -176,7 +185,6 @@ const Students: React.FC = () => {
         </table>
       </div>
 
-      {/* Modal de Edição */}
       <Modal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
