@@ -40,7 +40,7 @@ const StudentRegistration: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Buscar os dados completos que a secretaria aprovou na tabela 'alunos'
+      // 1. Busca os dados do aluno APROVADO (Tabela 'alunos')
       const { data: studentData, error: selectError } = await supabase
         .from('alunos')
         .select('*')
@@ -53,60 +53,57 @@ const StudentRegistration: React.FC = () => {
         return;
       }
       
-      // 2. Buscar dados adicionais de endereço na tabela original de 'inscricoes'
+      // 2. Busca os dados detalhados da INSCRIÇÃO ORIGINAL (Tabela 'inscricoes')
+      // É daqui que vem o telefone, data de nascimento e endereço
       const { data: inscricaoData } = await supabase
         .from('inscricoes')
-        .select('telefone, data_nascimento, rg, cep, rua, numero, complemento, bairro, municipio, uf')
+        .select('*') // Pega tudo para garantir
         .eq('id', studentData.inscricao_origem_id)
         .single();
 
-      // 3. Criar o usuário no Supabase Auth
+      // 3. Cria o usuário no sistema de Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
-        options: {
-          data: {
-            full_name: studentData.nome,
-            ra: studentData.ra
-          }
-        }
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        // 4. A MÁGICA: Copiar os dados para a tabela 'profiles'
+        // 4. PREENCHE O PERFIL DO ALUNO (Tabela 'profiles')
+        // Aqui unificamos tudo. Se não achou na inscrição, tenta manter o que tem.
         
-        // Separa Nome e Sobrenome
-        const partesNome = studentData.nome.split(' ');
-        const primeiroNome = partesNome[0];
-        const restanteSobrenome = partesNome.slice(1).join(' ');
+        const updates = {
+          nome: studentData.nome, // NOME COMPLETO (Vem da tabela alunos)
+          sobrenome: '', // Deixamos vazio pois agora usamos nome completo
+          ra: studentData.ra,
+          cpf: studentData.cpf,
+          avatar_url: studentData.foto_rosto_url, // Foto da Biometria
+          
+          // Dados que vêm da inscrição (com verificação de segurança)
+          telefone: inscricaoData?.telefone || null,
+          data_nascimento: inscricaoData?.data_nascimento || null,
+          rg: inscricaoData?.rg || null,
+          
+          // Endereço
+          cep: inscricaoData?.cep || null,
+          rua: inscricaoData?.rua || null,
+          numero: inscricaoData?.numero || null,
+          complemento: inscricaoData?.complemento || null,
+          bairro: inscricaoData?.bairro || null,
+          municipio: inscricaoData?.municipio || null,
+          uf: inscricaoData?.uf || null,
+          
+          updated_at: new Date(),
+        };
 
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({
-            nome: primeiroNome,
-            sobrenome: restanteSobrenome,
-            ra: studentData.ra,
-            cpf: studentData.cpf,
-            // A foto da biometria vira o avatar inicial
-            avatar_url: studentData.foto_rosto_url, 
-            // Dados vindos da inscrição
-            telefone: inscricaoData?.telefone,
-            data_nascimento: inscricaoData?.data_nascimento,
-            rg: inscricaoData?.rg,
-            cep: inscricaoData?.cep,
-            rua: inscricaoData?.rua,
-            numero: inscricaoData?.numero,
-            complemento: inscricaoData?.complemento,
-            bairro: inscricaoData?.bairro,
-            municipio: inscricaoData?.municipio,
-            uf: inscricaoData?.uf
-          })
+          .update(updates)
           .eq('id', authData.user.id);
 
         if (profileError) {
-          console.error('Erro ao atualizar perfil:', profileError);
+          console.error('Erro ao salvar dados no perfil:', profileError);
         }
       }
 
@@ -114,7 +111,7 @@ const StudentRegistration: React.FC = () => {
 
     } catch (err: any) {
       if (err.message.includes('User already registered')) {
-         setError('Este email já foi cadastrado. Tente fazer login no portal.');
+         setError('Este email já possui cadastro. Tente fazer login.');
       } else {
          setError(`Ocorreu um erro: ${err.message}`);
       }
@@ -203,9 +200,6 @@ const StudentRegistration: React.FC = () => {
                     <CheckCircle className="w-6 h-6 mr-3 flex-shrink-0" />
                     <p className="text-sm font-medium">{successMessage}</p>
                 </div>
-                <a href="https://seu-portal-do-aluno.vercel.app" className="text-primary-600 hover:text-primary-500 font-medium underline">
-                  Ir para o Login do Portal
-                </a>
             </div>
         )}
       </div>
