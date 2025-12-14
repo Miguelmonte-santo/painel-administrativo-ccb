@@ -46,12 +46,15 @@ export interface Inscricao {
 
 export interface Aluno {
   id: string;
+  created_at: string;
   nome: string;
   email: string;
-  ra: number;
+  ra: string;
+  cpf: string;
   turma: string | null;
   ativo: boolean;
   foto_rosto_url: string | null;
+  inscricao_origem_id?: string;
 }
 
 

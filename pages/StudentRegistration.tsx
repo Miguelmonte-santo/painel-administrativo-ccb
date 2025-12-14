@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Lock, Mail, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -44,7 +43,7 @@ const StudentRegistration: React.FC = () => {
       // 1. Buscar os dados completos que a secretaria aprovou na tabela 'alunos'
       const { data: studentData, error: selectError } = await supabase
         .from('alunos')
-        .select('*') // Pega tudo: RA, CPF, Nome, Foto, ID da Inscrição...
+        .select('*')
         .eq('email', email)
         .single();
         
@@ -54,8 +53,7 @@ const StudentRegistration: React.FC = () => {
         return;
       }
       
-      // 2. Buscar dados adicionais de endereço na tabela original de 'inscricoes' se necessário
-      // (Opcional: se você quiser preencher o endereço no perfil também)
+      // 2. Buscar dados adicionais de endereço na tabela original de 'inscricoes'
       const { data: inscricaoData } = await supabase
         .from('inscricoes')
         .select('telefone, data_nascimento, rg, cep, rua, numero, complemento, bairro, municipio, uf')
@@ -67,7 +65,6 @@ const StudentRegistration: React.FC = () => {
         email: email,
         password: password,
         options: {
-          // Salva metadados úteis no token do usuário
           data: {
             full_name: studentData.nome,
             ra: studentData.ra
@@ -78,13 +75,12 @@ const StudentRegistration: React.FC = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // 4. A MÁGICA: Copiar os dados da tabela 'alunos'/'inscricoes' para a tabela 'profiles'
-        // Agora que o usuário existe, atualizamos o perfil dele com os dados aprovados.
+        // 4. A MÁGICA: Copiar os dados para a tabela 'profiles'
         
-        // Separa Nome e Sobrenome (já que no 'alunos' está junto)
-        const nomeCompleto = studentData.nome.split(' ');
-        const primeiroNome = nomeCompleto[0];
-        const restanteSobrenome = nomeCompleto.slice(1).join(' ');
+        // Separa Nome e Sobrenome
+        const partesNome = studentData.nome.split(' ');
+        const primeiroNome = partesNome[0];
+        const restanteSobrenome = partesNome.slice(1).join(' ');
 
         const { error: profileError } = await supabase
           .from('profiles')
@@ -93,8 +89,9 @@ const StudentRegistration: React.FC = () => {
             sobrenome: restanteSobrenome,
             ra: studentData.ra,
             cpf: studentData.cpf,
-            avatar_url: studentData.foto_rosto_url, // A foto da biometria vai para o avatar inicial
-            // Dados vindos da inscrição original (se encontrados)
+            // A foto da biometria vira o avatar inicial
+            avatar_url: studentData.foto_rosto_url, 
+            // Dados vindos da inscrição
             telefone: inscricaoData?.telefone,
             data_nascimento: inscricaoData?.data_nascimento,
             rg: inscricaoData?.rg,
@@ -106,11 +103,10 @@ const StudentRegistration: React.FC = () => {
             municipio: inscricaoData?.municipio,
             uf: inscricaoData?.uf
           })
-          .eq('id', authData.user.id); // Usa o ID do usuário recém criado
+          .eq('id', authData.user.id);
 
         if (profileError) {
           console.error('Erro ao atualizar perfil:', profileError);
-          // Não paramos o fluxo aqui, pois o login foi criado, mas logamos o erro
         }
       }
 
@@ -145,12 +141,11 @@ const StudentRegistration: React.FC = () => {
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isEmailFromUrl || loading}
-                  className="block w-full px-10 py-3 text-gray-900 placeholder-gray-500 bg-gray-100 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 dark:bg-dark-700 dark:border-dark-600 dark:text-white dark:placeholder-gray-400 sm:text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="block w-full px-10 py-3 text-gray-900 bg-gray-100 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-700 dark:border-dark-600 dark:text-white sm:text-sm disabled:opacity-70"
                   placeholder="Seu email de inscrição"
                 />
               </div>
@@ -166,7 +161,7 @@ const StudentRegistration: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="block w-full px-10 py-3 text-gray-900 placeholder-gray-500 bg-gray-100 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 dark:bg-dark-700 dark:border-dark-600 dark:text-white dark:placeholder-gray-400 sm:text-sm"
+                  className="block w-full px-10 py-3 text-gray-900 bg-gray-100 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-700 dark:border-dark-600 dark:text-white sm:text-sm"
                   placeholder="Crie uma senha"
                 />
               </div>
@@ -182,7 +177,7 @@ const StudentRegistration: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
-                  className="block w-full px-10 py-3 text-gray-900 placeholder-gray-500 bg-gray-100 border border-gray-300 rounded-md appearance-none focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 dark:bg-dark-700 dark:border-dark-600 dark:text-white dark:placeholder-gray-400 sm:text-sm"
+                  className="block w-full px-10 py-3 text-gray-900 bg-gray-100 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-700 dark:border-dark-600 dark:text-white sm:text-sm"
                   placeholder="Confirme sua senha"
                 />
               </div>
@@ -194,15 +189,13 @@ const StudentRegistration: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="relative flex justify-center w-full px-4 py-3 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md group hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-primary-400 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Cadastrando...' : 'Finalizar Cadastro'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="relative flex justify-center w-full px-4 py-3 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-primary-400"
+              >
+                {loading ? 'Cadastrando...' : 'Finalizar Cadastro'}
+              </button>
             </form>
         ) : (
             <div className="text-center py-4">
@@ -210,10 +203,7 @@ const StudentRegistration: React.FC = () => {
                     <CheckCircle className="w-6 h-6 mr-3 flex-shrink-0" />
                     <p className="text-sm font-medium">{successMessage}</p>
                 </div>
-                <a 
-                  href="https://seu-portal-do-aluno.vercel.app" 
-                  className="text-primary-600 hover:text-primary-500 font-medium underline"
-                >
+                <a href="https://seu-portal-do-aluno.vercel.app" className="text-primary-600 hover:text-primary-500 font-medium underline">
                   Ir para o Login do Portal
                 </a>
             </div>
