@@ -13,6 +13,10 @@ const StudentRegistration: React.FC = () => {
   
   const [isEmailFromUrl, setIsEmailFromUrl] = useState(false);
 
+  // URL do portal do aluno (Dinâmica)
+  // FIX: Type casting import.meta to allow env property access if vite types are missing
+  const studentPortalUrl = (import.meta as any).env.VITE_STUDENT_PORTAL_URL || 'http://localhost:5173';
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const emailFromUrl = params.get('email');
@@ -200,6 +204,9 @@ const StudentRegistration: React.FC = () => {
                     <CheckCircle className="w-6 h-6 mr-3 flex-shrink-0" />
                     <p className="text-sm font-medium">{successMessage}</p>
                 </div>
+                <a href={studentPortalUrl} className="text-primary-600 hover:text-primary-500 font-medium underline">
+                  Ir para o Login do Portal
+                </a>
             </div>
         )}
       </div>

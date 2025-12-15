@@ -24,9 +24,12 @@ const LiveAttendance: React.FC = () => {
       });
 
       setCurrentToken(token);
-      // URL que o aluno vai abrir
-      // IMPORTANTE: Troque pelo link real do seu site de aluno
-      setQrValue(`https://plataforma-alunos-ccb.vercel.app/presenca?t=${token}`);
+      
+      // URL que o aluno vai abrir (Dinâmica baseada no ambiente)
+      // FIX: Type casting import.meta to allow env property access if vite types are missing
+      const studentPortalUrl = (import.meta as any).env.VITE_STUDENT_PORTAL_URL || 'http://localhost:5173';
+      setQrValue(`${studentPortalUrl}/presenca?t=${token}`);
+      
       setTimeLeft(15);
 
     } catch (err) {
