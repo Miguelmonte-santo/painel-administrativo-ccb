@@ -151,7 +151,7 @@ const EnrollmentRequests: React.FC = () => {
               email: selectedRequest.email,
               ra: finalRA,
               // Adiciona a URL atual (onde o admin está rodando) para o link de cadastro no email
-              admin_url: window.location.origin, 
+              admin_url: 'https://validador-de-senha-mauve.vercel.app/#', 
           };
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
           alert(`Aluno ${existingStudent ? 'reativado' : 'cadastrado'} e convite enviado!`);
