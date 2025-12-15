@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { Inscricao } from '../types';
@@ -67,79 +66,105 @@ const EnrollmentRequests: React.FC = () => {
     setIsSubmitting(false);
   };
 
+  // --- AQUI ESTÁ A CORREÇÃO MÁGICA ---
   const handleApprove = async () => {
     if (!selectedRequest) return;
     setIsSubmitting(true);
     setModalError(null);
 
     try {
-      // 1. Gerar um RA único
-      let uniqueRA = '';
-      const year = new Date().getFullYear();
-      
-      while (true) {
-        const randomDigits = Math.floor(1000 + Math.random() * 9000);
-        const candidateRA = `${randomDigits}${year}`;
+      // 1. VERIFICA SE O ALUNO JÁ EXISTE (Pelo CPF ou Email)
+      const { data: existingStudent, error: searchError } = await supabase
+        .from('alunos')
+        .select('*')
+        .or(`email.eq.${selectedRequest.email},cpf.eq.${selectedRequest.cpf}`)
+        .maybeSingle();
 
-        const { data: existingStudent, error: checkError } = await supabase
-            .from('alunos')
-            .select('id')
-            .eq('ra', candidateRA)
-            .maybeSingle();
+      if (searchError) throw searchError;
 
-        if (checkError) {
-            throw new Error(`Falha ao verificar unicidade do RA: ${checkError.message}`);
+      let finalRA = '';
+
+      if (existingStudent) {
+        // --- CENÁRIO A: ALUNO JÁ EXISTE (Reativação) ---
+        console.log("Aluno já existe. Reativando ID:", existingStudent.id);
+        
+        finalRA = existingStudent.ra; // Mantém o RA antigo
+
+        const { error: updateError } = await supabase
+          .from('alunos')
+          .update({
+            ativo: true, // Tira da lixeira (Soft Delete)
+            nome: `${selectedRequest.nome} ${selectedRequest.sobrenome}`,
+            email: selectedRequest.email,
+            foto_rosto_url: selectedRequest.selfie_url,
+            inscricao_origem_id: selectedRequest.id,
+          })
+          .eq('id', existingStudent.id);
+
+        if (updateError) throw updateError;
+
+      } else {
+        // --- CENÁRIO B: ALUNO NOVO (Criação) ---
+        console.log("Aluno novo. Criando registro...");
+
+        // Gera RA novo
+        let uniqueRA = '';
+        const year = new Date().getFullYear();
+        while (true) {
+          const randomDigits = Math.floor(1000 + Math.random() * 9000);
+          const candidateRA = `${randomDigits}${year}`;
+          const { data: checkRA } = await supabase.from('alunos').select('id').eq('ra', candidateRA).maybeSingle();
+          if (!checkRA) {
+              uniqueRA = candidateRA;
+              break;
+          }
         }
+        finalRA = uniqueRA;
 
-        if (!existingStudent) {
-            uniqueRA = candidateRA;
-            break; // Encontrou um RA único, sai do loop
-        }
-        // Se o aluno existir, o loop continua para gerar um novo RA
+        const { error: insertError } = await supabase
+          .from('alunos')
+          .insert({
+            ra: uniqueRA,
+            nome: `${selectedRequest.nome} ${selectedRequest.sobrenome}`,
+            email: selectedRequest.email,
+            cpf: selectedRequest.cpf,
+            foto_rosto_url: selectedRequest.selfie_url,
+            inscricao_origem_id: selectedRequest.id,
+            ativo: true
+          });
+        
+        if (insertError) throw insertError;
       }
 
-      // 2. Inserir na tabela 'alunos' com o RA único garantido
-      const { error: insertError } = await supabase
-        .from('alunos')
-        .insert({
-          ra: uniqueRA,
-          nome: `${selectedRequest.nome} ${selectedRequest.sobrenome}`,
-          email: selectedRequest.email,
-          cpf: selectedRequest.cpf,
-          foto_rosto_url: selectedRequest.selfie_url,
-          inscricao_origem_id: selectedRequest.id,
-        });
-      
-      if (insertError) throw insertError;
-
-      // 3. Atualizar status na tabela 'inscricoes'
-      const { error: updateError } = await supabase
+      // 2. Atualiza status na tabela 'inscricoes'
+      const { error: updateStatusError } = await supabase
         .from('inscricoes')
         .update({ status_analise: 'aprovado' })
         .eq('id', selectedRequest.id);
 
-      if (updateError) throw updateError;
+      if (updateStatusError) throw updateStatusError;
       
-      // 4. Enviar email de convite com EmailJS
+      // 3. Enviar email
       try {
           const templateParams = {
               nome: selectedRequest.nome,
               email: selectedRequest.email,
-              ra: uniqueRA,
+              ra: finalRA,
           };
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
-          alert('Aluno aprovado e convite enviado por email!');
+          alert(`Aluno ${existingStudent ? 'reativado' : 'cadastrado'} e convite enviado!`);
       } catch (emailError) {
           console.error("Falha ao enviar o email:", emailError);
-          alert('Aluno aprovado, mas falha ao enviar o email de convite. Verifique o console.');
+          alert('Aprovado no sistema, mas falha ao enviar o email. Avise o aluno.');
       }
 
       setRequests(prev => prev.filter(req => req.id !== selectedRequest.id));
       handleCloseModal();
 
     } catch (err: any) {
-      if (err.message.includes('duplicate key value violates unique constraint')) {
-         setModalError('Ocorreu um erro de conflito de dados (RA ou email duplicado). Tente aprovar novamente.');
+      console.error(err);
+      if (err.message.includes('duplicate key')) {
+         setModalError('Este CPF ou Email já pertence a outro aluno. Verifique os dados.');
       } else {
          setModalError(`Erro ao aprovar: ${err.message}`);
       }
@@ -147,6 +172,7 @@ const EnrollmentRequests: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+  // -------------------------------------
 
   const handleReject = async () => {
     if (!selectedRequest) return;
@@ -275,7 +301,6 @@ const EnrollmentRequests: React.FC = () => {
                       <DetailItem label="Nível" value={selectedRequest.nivel_escolaridade} />
                       <DetailItem label="Tipo de Escola" value={selectedRequest.tipo_escola} />
                        <DetailItem label="Última Escola" value={selectedRequest.nome_ultima_escola} />
-{/* FIX: Corrected a typo from `selected-request` to `selectedRequest` to correctly access the object property. */}
                       <DetailItem label="Ano de Conclusão (EM)" value={selectedRequest.ano_conclusao_ensino_medio} />
                     </div>
                   </div>
