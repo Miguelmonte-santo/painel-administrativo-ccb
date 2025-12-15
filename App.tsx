@@ -7,6 +7,7 @@ import EnrollmentRequests from './pages/EnrollmentRequests';
 import Students from './pages/Students';
 import LoginPage from './pages/LoginPage';
 import StudentRegistration from './pages/StudentRegistration';
+import LiveAttendance from './pages/LiveAttendance';
 import type { Page } from './types';
 
 
@@ -44,7 +45,7 @@ const App: React.FC = () => {
       case 'Professores':
         return <div className="p-6 text-gray-700 dark:text-gray-300">Página de Professores (Em construção)</div>;
       case 'Presença':
-        return <div className="p-6 text-gray-700 dark:text-gray-300">Página de Presença (Em construção)</div>;
+        return <LiveAttendance />;
       case 'Configurações':
         return <div className="p-6 text-gray-700 dark:text-gray-300">Página de Configurações (Em construção)</div>;
       default:
