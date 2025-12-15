@@ -6,54 +6,100 @@ import { Loader2 } from 'lucide-react';
 const LiveAttendance: React.FC = () => {
   const [currentToken, setCurrentToken] = useState<string>('');
   const [qrValue, setQrValue] = useState<string>('');
-  const [timeLeft, setTimeLeft] = useState(180); // Troca a cada 3 minutos (180s)
+  
+  // 7200 segundos = 2 horas
+  const TOKEN_DURATION_SECONDS = 7200; 
+  const [timeLeft, setTimeLeft] = useState(TOKEN_DURATION_SECONDS);
 
-  // Função que gera o token no banco
-  const generateToken = async () => {
+  // URL FIXA da sua plataforma (produção)
+  const STUDENT_PORTAL_URL = 'https://plataforma-de-estudos-final-wqst.vercel.app';
+
+  // Função que busca token ativo ou gera novo
+  const fetchOrGenerateToken = async () => {
     try {
-      // Gera string aleatória
+      // 1. Procura no banco se tem algum token que AINDA VAI expirar
+      const { data, error } = await supabase
+        .from('tokens_presenca')
+        .select('*')
+        .gt('expires_at', new Date().toISOString()) // Data expiração > Agora
+        .order('created_at', { ascending: false }) // Pega o mais recente
+        .limit(1)
+        .single();
+
+      if (data && !error) {
+        // ACHOU! Reutiliza o mesmo token (Sincronização)
+        console.log("Token ativo encontrado, reutilizando:", data.token);
+        setupTokenOnScreen(data.token, data.expires_at);
+      } else {
+        // NÃO ACHOU (ou expirou): Gera um novo
+        console.log("Nenhum token ativo, gerando novo...");
+        await generateNewToken();
+      }
+    } catch (err) {
+      // Se der erro na busca (tabela vazia), gera novo
+      await generateNewToken();
+    }
+  };
+
+  const generateNewToken = async () => {
+    try {
       const token = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
       
-      // Salva no banco com validade (3 minutos + 10 segundos de tolerância)
       const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + 190);
+      // Adiciona duração + 10s de gordura
+      expiresAt.setSeconds(expiresAt.getSeconds() + TOKEN_DURATION_SECONDS + 10);
 
       await supabase.from('tokens_presenca').insert({
         token: token,
         expires_at: expiresAt.toISOString()
       });
 
-      setCurrentToken(token);
-      
-      // URL que o aluno vai abrir (Dinâmica baseada no ambiente)
-      // FIX: Type casting import.meta to allow env property access if vite types are missing
-      const studentPortalUrl = (import.meta as any).env.VITE_STUDENT_PORTAL_URL || 'http://localhost:5173';
-      setQrValue(`${studentPortalUrl}/presenca?t=${token}`);
-      
-      setTimeLeft(180);
-
+      setupTokenOnScreen(token, expiresAt.toISOString());
     } catch (err) {
       console.error("Erro ao gerar token:", err);
     }
   };
 
-  // Loop Infinito (Heartbeat)
+  const setupTokenOnScreen = (token: string, expiresAtIso: string) => {
+    setCurrentToken(token);
+    setQrValue(`${STUDENT_PORTAL_URL}/presenca?t=${token}`);
+    
+    // Calcula quanto tempo falta para o timer visual
+    const expires = new Date(expiresAtIso).getTime();
+    const now = new Date().getTime();
+    const secondsLeft = Math.floor((expires - now) / 1000);
+    
+    setTimeLeft(secondsLeft > 0 ? secondsLeft : 0);
+  };
+
+  // Inicialização e Loop de Verificação
   useEffect(() => {
-    generateToken(); // Gera o primeiro
+    fetchOrGenerateToken(); // Roda ao abrir a tela
 
-    const interval = setInterval(() => {
-      generateToken();
-    }, 180000); // 3 minutos (180000ms)
+    // Verifica a cada 1 minuto se precisa renovar
+    const heartbeat = setInterval(() => {
+        if (timeLeft <= 10) { // Se faltar pouco tempo, busca/gera outro
+            fetchOrGenerateToken();
+        }
+    }, 60000);
 
+    // Timer visual (contagem regressiva)
     const countdown = setInterval(() => {
         setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => {
-        clearInterval(interval);
+        clearInterval(heartbeat);
         clearInterval(countdown);
     };
-  }, []);
+  }, [timeLeft]); // Dependência do timeLeft para o heartbeat saber o valor atual
+
+  // Formata o tempo para MM:SS
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] bg-gray-100 dark:bg-gray-900 p-8">
@@ -76,16 +122,16 @@ const LiveAttendance: React.FC = () => {
             </div>
         )}
         
-        <div className="absolute -top-3 -right-3 bg-red-500 text-white font-bold w-10 h-10 rounded-full flex items-center justify-center shadow-lg">
-            {timeLeft}
+        <div className="absolute -top-3 -right-3 bg-red-500 text-white font-bold px-3 py-1 rounded-full flex items-center justify-center shadow-lg text-sm">
+            {formatTime(timeLeft)}
         </div>
       </div>
 
       <p className="mt-8 text-sm text-gray-400 font-mono">
-        Token Atual: {currentToken || 'Gerando...'}
+        Token Atual: {currentToken || 'Carregando...'}
       </p>
       <p className="text-xs text-gray-400 mt-2">
-        O código expira automaticamente para evitar fraudes.
+        O código é válido por 2 horas.
       </p>
     </div>
   );
