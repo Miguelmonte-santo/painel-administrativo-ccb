@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 const LiveAttendance: React.FC = () => {
   const [currentToken, setCurrentToken] = useState<string>('');
   const [qrValue, setQrValue] = useState<string>('');
-  const [timeLeft, setTimeLeft] = useState(15); // Troca a cada 15s
+  const [timeLeft, setTimeLeft] = useState(180); // Troca a cada 3 minutos (180s)
 
   // Função que gera o token no banco
   const generateToken = async () => {
@@ -14,9 +14,9 @@ const LiveAttendance: React.FC = () => {
       // Gera string aleatória
       const token = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
       
-      // Salva no banco com validade curta (ex: 30 segundos de tolerância)
+      // Salva no banco com validade (3 minutos + 10 segundos de tolerância)
       const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + 30);
+      expiresAt.setSeconds(expiresAt.getSeconds() + 190);
 
       await supabase.from('tokens_presenca').insert({
         token: token,
@@ -30,7 +30,7 @@ const LiveAttendance: React.FC = () => {
       const studentPortalUrl = (import.meta as any).env.VITE_STUDENT_PORTAL_URL || 'http://localhost:5173';
       setQrValue(`${studentPortalUrl}/presenca?t=${token}`);
       
-      setTimeLeft(15);
+      setTimeLeft(180);
 
     } catch (err) {
       console.error("Erro ao gerar token:", err);
@@ -43,7 +43,7 @@ const LiveAttendance: React.FC = () => {
 
     const interval = setInterval(() => {
       generateToken();
-    }, 15000); // 15 segundos
+    }, 180000); // 3 minutos (180000ms)
 
     const countdown = setInterval(() => {
         setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
