@@ -58,4 +58,4 @@ export interface Aluno {
 }
 
 
-export type Page = 'Dashboard' | 'Solicitações de Matrícula' | 'Alunos' | 'Professores' | 'Presença' | 'Configurações';
+export type Page = 'Dashboard' | 'Solicitações de Matrícula' | 'Alunos' | 'Professores' | 'Presença' | 'Relatórios' | 'Configurações';

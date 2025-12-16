@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
@@ -8,6 +7,7 @@ import Students from './pages/Students';
 import LoginPage from './pages/LoginPage';
 import StudentRegistration from './pages/StudentRegistration';
 import LiveAttendance from './pages/LiveAttendance';
+import AttendanceReport from './pages/AttendanceReport';
 import type { Page } from './types';
 
 
@@ -46,6 +46,8 @@ const App: React.FC = () => {
         return <div className="p-6 text-gray-700 dark:text-gray-300">Página de Professores (Em construção)</div>;
       case 'Presença':
         return <LiveAttendance />;
+      case 'Relatórios':
+        return <AttendanceReport />;
       case 'Configurações':
         return <div className="p-6 text-gray-700 dark:text-gray-300">Página de Configurações (Em construção)</div>;
       default:

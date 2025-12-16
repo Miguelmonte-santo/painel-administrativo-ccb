@@ -1,7 +1,6 @@
-
 import React from 'react';
 import type { Page } from '../../types';
-import { LayoutDashboard, UserCheck, Users, Settings, X, BookUser, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, UserCheck, Users, Settings, X, BookUser, ClipboardCheck, FileBarChart } from 'lucide-react';
 
 interface SidebarProps {
   currentPage: Page;
@@ -16,6 +15,7 @@ const navItems: { name: Page; icon: React.ElementType }[] = [
   { name: 'Alunos', icon: Users },
   { name: 'Professores', icon: BookUser },
   { name: 'Presença', icon: ClipboardCheck },
+  { name: 'Relatórios', icon: FileBarChart },
   { name: 'Configurações', icon: Settings },
 ];
 
